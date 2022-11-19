@@ -1,0 +1,496 @@
+*BASIC
+NEW
+AUTO
+REM>FSTimeAsm
+:
+REM Read time from an Econet
+REM fileserver, optionally
+REM setting the local machine's
+REM CMOS or IntegraB RTC.
+REM
+REM This handles dates using the
+REM 3-bit hack into the day
+REM field, as supported by
+REM PiEconetBridge.
+:
+VER$="v0.1 (2022-11-19)"
+:
+DIM code 1000
+target=&2C00
+:
+XOSCLI=&FFF7
+OSWORD=&FFF1
+OSASCI=&FFE3
+OSARGS=&FFDA
+:
+SCRATCH=&A8
+YEAR=SCRATCH
+WEEKDAY=SCRATCH+1
+SETCLOCK=SCRATCH+2
+:
+FOR pass%=0 TO 1
+opt%=pass%*2+4
+P%=target
+O%=code
+:
+[ OPT opt%
+EQUS VER$
+:
+.start
+\ get pointer to command line
+LDA #1
+LDY #0
+LDX #SCRATCH
+JSR OSARGS
+LDY #&FF
+.loop
+INY
+LDA (SCRATCH),Y
+CMP #ASC" " \ skip spaces
+BEQ loop
+:
+\ check for valid option
+CMP #13 \ =CR
+BEQ storeopt
+CMP #ASC"S"
+BEQ storeopt
+CMP #ASC"I"
+BEQ storeopt
+:
+LDY #&FF
+.loop
+INY
+LDA usagemsg,Y
+JSR OSASCI
+CMP #13 \ =CR
+BNE loop
+RTS
+:
+.usagemsg
+EQUS "Usage: FSTIME (S|I)"
+EQUB 13 \ =CR
+:
+.storeopt
+\ store first non-space char in
+\ SETCLOCK to record mode
+STA SETCLOCK
+:
+\ call FS to ask for time
+LDA #0
+STA cblock
+LDA #4 \ =size of rest of block
+STA cblock+1
+LDA #0 \ =for reply port num
+STA cblock+2
+LDA #16 \ =read time from FS
+STA cblock+3
+LDA #0
+STA cblock+4
+STA cblock+5
+STA cblock+6
+LDA #&14 \ =comm with to FS
+LDX #cblock AND &FF
+LDY #cblock DIV &100
+JSR OSWORD
+LDA cblock+3 \ =return code
+BEQ fsok \ 0 => success
+\ FS error will trigger BRK in
+\ network code; we just need to
+\ catch OSWORD being unhandled
+BRK
+EQUB 161 \ =Net error
+EQUS "Fileserver time not available (logged on?)"
+BRK
+:
+.fsok
+\ the year-1981 is split across
+\ two bytes-
+\ - bits 0-3 in 4-7 of YM
+\ - bits 4-6 in 5-7 of (Y)D; a
+\    later hack for >1996
+LDA cblock+5 \ YM bits 4-7
+LSR A \ shift to bits 0-3
+LSR A
+LSR A
+LSR A
+STA YEAR
+LDA cblock+4 \ =(Y)D
+AND #&E0 \ Y in bits 5-7
+LSR A \ shift to bits 4-6
+ORA YEAR
+STA YEAR \ =year-1981
+:
+\ "Wkd"
+:
+\ calculate the weekday; this is
+\ done in several stages-
+\ - +1 for each year after 1981
+\ - +1 for each full leap year
+\    before current year
+\ - +1 if leap year and month>=3
+\    for 29 Feb
+\ - +offset for current month
+\    from 01 Jan
+\ - +day (of month) -1
+\ - 01 Jan 1981 is Thu (=4)
+:
+\ +1 for each year after 1981
+STA WEEKDAY
+:
+\ save year for later but align
+\ so Y MOD 4=0 => leap year
+TAY
+INY
+:
+\ +1 for each full leap year
+\ before current year
+LDA YEAR
+LSR A
+LSR A
+CLC
+ADC WEEKDAY
+STA WEEKDAY
+:
+\ get month
+LDA cblock+5 \ =YM
+AND #&0F \ only bottom 4 bits
+TAX \ save for offset later
+:
+\ +1 if leap year and month>=3
+\ for 29 Feb
+TYA \ year saved from ealier
+AND #&03 \ check if leap year
+BNE monthadj
+CPX #3 \ >=Mar
+BCC monthadj
+\ leap year and month>=3 so need
+\ to add a weekday for 29 Feb
+INC WEEKDAY
+:
+.monthadj
+\ +offset for current month from
+\ 01 Jan
+LDA WEEKDAY
+\ month in X, so add offset up
+\ to start of this month (0
+\ base, so index-1)
+CLC
+ADC monthoffset-1,X
+STA WEEKDAY
+:
+\ +day (of month) -1 +4 (Thu)
+LDA cblock+4 \ =(Y)D
+AND #&1F \ D in bits 0-4
+CLC
+ADC WEEKDAY
+ADC #4-1 \ +Thu offset (4) -1
+:
+\ convert weekday offset MOD 7
+SEC
+.loop
+SBC #7
+BCS loop
+ADC #7
+:
+\ Y is offset into string
+\ buffer; start at 1 to skip
+\ CMOS op byte, if needed
+LDY #1
+:
+\ store weekday string
+ASL A \ *4 to index name
+ASL A
+TAX
+\ copy 3 chars for weekday name
+LDA weekdaynames,X
+JSR sta
+LDA weekdaynames+1,X
+JSR sta
+LDA weekdaynames+2,X
+JSR sta
+:
+LDA #ASC","
+JSR sta
+:
+\ "DD Mon YYYY"
+:
+LDA cblock+4 \ =(Y)D
+AND #&1F \ D in bits 0-4
+JSR stdec0
+:
+JSR stspc
+:
+LDA cblock+5 \ =YM
+AND #&0F \ M in bits 0-3
+ASL A \ *4 index into names
+ASL A
+TAX
+\ copy 3 chars for month name
+LDA monthnames-4,X
+JSR sta
+LDA monthnames-3,X
+JSR sta
+LDA monthnames-2,X
+JSR sta
+:
+JSR stspc
+:
+JSR styear4
+:
+\ ".hh.mm.ss"
+LDA #ASC"."
+JSR sta
+JSR sttime
+:
+JSR stcr
+:
+\ print the generated string
+LDY #&0 \ skip op byte
+.loop
+INY
+LDA buffer,Y
+JSR OSASCI
+CMP #13 \ =CR
+BNE loop
+:
+\ are we updating the battery-
+\ backed RTC on this host?
+LDA SETCLOCK
+CMP #ASC"S" \ set CMOS clock
+BEQ setcmos
+CMP #ASC"I" \ set IntegraB clock
+BEQ setintegrab
+RTS
+:
+.setcmos
+\ print msg and update clock
+LDY #&FF
+.loop
+INY
+LDA setcmosmsg,Y
+JSR OSASCI
+CMP #13 \ =CR
+BNE loop
+:
+LDA #24 \ update date+time op
+STA buffer
+LDA #&0F \ =write CMOS date+time
+LDX #buffer AND &FF
+LDY #buffer DIV &100
+JMP OSWORD \ implicit RTS
+:
+.setintegrab
+LDY #&FF
+.loop
+INY
+LDA setintegrabmsg,Y
+JSR OSASCI
+CMP #13 \ =CR
+BNE loop
+:
+\ build *DATE command
+:
+\ "DATE ="
+:
+LDY #0 \ post-inc for JSR sta
+.loop
+LDA setdatecmd,Y
+STA buffer,Y
+INY
+CMP #ASC"="
+BNE loop
+:
+\ "DD/MM/YYYY"
+:
+LDA cblock+4 \ =(Y)D
+AND #&1F
+JSR stdec0
+LDA #ASC"/"
+JSR sta
+LDA cblock+5 \ =YM
+AND #&0F
+JSR stdec0
+LDA #ASC"/"
+JSR sta
+JSR styear4
+JSR stcr
+:
+JSR bufferoscli
+:
+\ "TIME =hh.mm.ss"
+:
+LDY #0 \ post-inc for JSR sta
+.loop
+LDA settimecmd,Y
+STA buffer,Y
+INY
+CMP #ASC"="
+BNE loop
+:
+JSR sttime
+JSR stcr
+JMP bufferoscli \ implicit RTS
+:
+\ star commands to set date and
+\ time on IntegraB
+.setdatecmd
+EQUS "DATE ="
+.settimecmd
+EQUS "TIME ="
+:
+.setcmosmsg
+EQUS "Setting CMOS clock"
+EQUB 13
+:
+.setintegrabmsg
+EQUS "Setting IntegraB clock"
+EQUB 13
+:
+.bufferoscli
+\ Execute OSCLI on command line
+\ at buffer.
+LDX #buffer AND &FF
+LDY #buffer DIV &100
+JMP XOSCLI \ implicit RTS
+:
+.styear4
+\ Store 4 digit year from YEAR
+\ at buffer+Y.
+LDA YEAR
+CLC
+ADC #81 \ add 1981 offset
+CMP #100 \ >=2000?
+PHA
+BCS year2000
+\ <2000, write "19"+Y
+LDA #ASC"1"
+JSR sta
+LDA #ASC"9"
+JSR sta
+PLA
+JMP stdec0 \ implicit RTS
+:
+.sttime
+\ Store time as "hh.mm.ss" ("."
+\ => colon) at buffer+Y.
+LDA cblock+6 \ =h
+JSR stdec0
+LDA #ASC":"
+JSR sta
+LDA cblock+7 \ =m
+JSR stdec0
+LDA #ASC":"
+JSR sta
+LDA cblock+8 \ =s
+JMP stdec0 \ implicit RTS
+:
+.year2000
+\ >=2000, write "20"+(Y-100)
+LDA #ASC"2"
+JSR sta
+LDA #ASC"0"
+JSR sta
+PLA
+SEC
+SBC #100
+JMP stdec0 \ implicit RTS
+:
+.stdec0
+\ Store decimal number 00-99 at
+\ buffer+Y.
+\ Entry- A=value,Y=index
+\ Exit-  AX undefined,Y=Y+2
+SEC
+LDX #&FF
+.loop
+INX
+SBC #10 \ count 10s
+BCS loop
+PHA
+TXA
+ORA #ASC"0"
+JSR sta
+PLA
+CLC
+ADC #10+ASC"0"
+JMP sta \ implicit RTS
+:
+.stcr
+\ Store CR at buffer+Y.
+\ Exit-  A=CR,X unchanged,Y=Y+1
+LDA #13 \ =CR
+JMP sta \ implicit RTS
+:
+.stspc
+\ Store space at buffer+Y.
+\ Exit-  A=" ",X unchanged,Y=Y+1
+LDA #ASC" "
+:
+.sta
+\ Store A at buffer+Y.
+\ Entry- A=char,Y=index
+\ Exit-  AX unchanged,Y=Y+1
+STA buffer,Y
+INY
+RTS
+:
+\ strings aligned on boundaries
+\ of 4 characters to make index
+\ calculation easier
+:
+.weekdaynames
+EQUS "Sun Mon Tue Wed Thu Fri "
+EQUS "Sat"
+:
+.monthnames
+EQUS "Jan Feb Mar Apr May Jun "
+EQUS "Jul Aug Sep Oct Nov Dec"
+:
+.monthoffset
+\ weekday shift to start of each
+\ month (number of days from
+\ start of year MOD 7)
+]
+RESTORE
+daystomonth%=0
+FOR month%=1 TO 11
+READ monthdays%
+daystomonth%=daystomonth%+monthdays%
+[ OPT opt%
+EQUB daystomonth% MOD 7
+]
+NEXT
+:
+REM econet msg control block
+cblock=FNalloc(9)
+:
+REM buffer for building time
+REM with byte at the start for
+REM specifying CMOS operation,
+REM if required
+REM
+REM "Wkd,DD Mon YYYY.hh.mm.ss"
+REM is longest at 24 bytes + 1
+REM byte for CR = 25
+buffer=FNalloc(25)
+:
+NEXT
+:
+save$="*SAVE FSTime "+STR$~code+"+"+STR$~(O%-code)+" FFFF"+STR$~start+" FFFF"+STR$~target
+PRINT save$
+OSCLI save$
+:
+END
+:
+DEFFNalloc(bytes%)
+LOCAL startP%
+startP%=P%
+P%=P%+bytes%
+O%=O%+bytes%
+=startP%
+:
+REM days in previous month
+REM used to calculate weekday
+REM offset
+DATA 0,31,28,31,30,31
+DATA 30,31,31,30,31,30
