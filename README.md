@@ -1,20 +1,25 @@
 ECONET FILESERVER TIME UTILITY
 ==============================
 
-This utility for the BBC Micro and Master will fetch the time and date from an
-Econet fileserver and display it in the same format as the `*TIME` command on
-a BBC Master (e.g. `Sat,19 Nov 2022.13:40:15`).
+This utility for the [BBC Micro](https://en.wikipedia.org/wiki/BBC_Micro) and
+Master will fetch the time and date from an Econet fileserver and display it
+in the same format as the `*TIME` command on a BBC Master (e.g. `Sat,19 Nov
+2022.13:40:15`).
 
-The fetch is done by OSWORD &14 (communicate with fileserver), function 16
-(read date and time) provided by the Econet NFS/ANFS ROM.
+The fetch is done by [OSWORD &14](https://beebwiki.mdfs.net/OSWORD_%2614)
+(communicate with fileserver), function 16 (read date and time) provided by
+the Econet NFS/ANFS ROM.
 
 When run with `S`, it will attempt to set the clock on the local machine to
 the time retrieved from the fileserver.  This will be done in one of two ways,
-depending on the result of OSBYTE &49, which identifies in IntegraB board is
-present (an upgrade for a Model B with a battery-backed RTC):
+depending on the result of
+[OSBYTE &49](https://beebwiki.mdfs.net/OSBYTE_%2649), which identifies an
+IntegraB board is present (an upgrade for a Model B with a battery-backed
+RTC):
 
-* if an IntegraB is not detected, OSWORD &0F call will be used, which will set
-the CMOS clock on a BBC Master
+* if an IntegraB is not detected,
+[OSWORD &0F](https://beebwiki.mdfs.net/OSWORD_%260F) call will be used, which
+will set the CMOS clock on a BBC Master
 * if an IntegraB is detected, the clock on that will be set using the [e.g.]
 `*DATE =19/11/2022` and `*TIME =13:40:15` OS commands
 
@@ -24,8 +29,9 @@ Reading the clock supports the 'date hack' to extend the original range of
 years from the 4-bit offset from 1981 (up to 1996) by using the top 3 bits of
 the 'day' field for years up to 2099.
 
-The utility has been tested against PiEconetBridge and an Acorn Level 3
-fileserver running patched v1.25 code to support the date hack.
+The utility has been tested against
+[PiEconetBridge](https://github.com/cr12925/PiEconetBridge) and an Acorn Level
+3 fileserver running patched v1.25 code to support the date hack.
 
 If you are not logged onto the fileserver, the error `Fileserver time not
 available (logged on?)` will be displayed.  If the fileserver is not found
