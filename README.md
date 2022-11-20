@@ -5,14 +5,20 @@ This utility for the BBC Micro and Master will fetch the time and date from an
 Econet fileserver and display it in the same format as the `*TIME` command on
 a BBC Master (e.g. `Sat,19 Nov 2022.13:40:15`).
 
-The fetch is done by OSWORD &14 [communicate with fileserver], function 16
-[read date and time]) provided by the Econet NFS/ANFS ROM.
+The fetch is done by OSWORD &14 (communicate with fileserver), function 16
+(read date and time) provided by the Econet NFS/ANFS ROM.
 
-When supplied with the option `S` or `I`, it will also attempt to set the
-time on the local machine using either the OSWORD &0F call (which works on the
-BBC Master to set the battery-backed CMOS clock) or using the [e.g.] `*DATE
-=19/11/2022` and `*TIME =13:40:15` commands required to set the battery-backed
-clock on an IntegraB module for the BBC Micro.
+When run with `S`, it will attempt to set the clock on the local machine to
+the time retrieved from the fileserver.  This will be done in one of two ways,
+depending on the result of OSBYTE &49, which identifies in IntegraB board is
+present (an upgrade for a Model B with a battery-backed RTC):
+
+* if an IntegraB is not detected, OSWORD &0F call will be used, which will set
+the CMOS clock on a BBC Master
+* if an IntegraB is detected, the clock on that will be set using the [e.g.]
+`*DATE =19/11/2022` and `*TIME =13:40:15` OS commands
+
+These modes can be forced using the `I` and `C` options, respectively.
 
 Reading the clock supports the 'date hack' to extend the original range of
 years from the 4-bit offset from 1981 (up to 1996) by using the top 3 bits of

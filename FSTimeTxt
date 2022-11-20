@@ -13,12 +13,13 @@ REM 3-bit hack into the day
 REM field, as supported by
 REM PiEconetBridge.
 :
-VER$="v0.1 (2022-11-19)"
+VER$="v0.2 (2022-11-20)"
 :
 DIM code 1000
 target=&2C00
 :
 XOSCLI=&FFF7
+OSBYTE=&FFF4
 OSWORD=&FFF1
 OSASCI=&FFE3
 OSARGS=&FFDA
@@ -53,6 +54,8 @@ BEQ loop
 CMP #13 \ =CR
 BEQ storeopt
 CMP #ASC"S"
+BEQ detectclock
+CMP #ASC"C"
 BEQ storeopt
 CMP #ASC"I"
 BEQ storeopt
@@ -67,8 +70,22 @@ BNE loop
 RTS
 :
 .usagemsg
-EQUS "Usage: FSTIME (S|I)"
+EQUS "Usage: FSTIME (S|C|I)"
 EQUB 13 \ =CR
+:
+.detectclock
+LDA #&49 \ =detect IntegraB
+LDX #&FF
+LDY #0
+JSR OSBYTE
+CPX #&49 \ =IntegraB present
+BEQ isintegrab
+\ no IntegraB - assume CMOS
+LDA #ASC"C"
+JMP storeopt
+:
+.isintegrab
+LDA #ASC"I"
 :
 .storeopt
 \ store first non-space char in
@@ -253,13 +270,13 @@ JSR OSASCI
 CMP #13 \ =CR
 BNE loop
 :
-\ are we updating the battery-
-\ backed RTC on this host?
+\ update the local host clock
 LDA SETCLOCK
-CMP #ASC"S" \ set CMOS clock
+CMP #ASC"C" \ set CMOS clock
 BEQ setcmos
 CMP #ASC"I" \ set IntegraB clock
 BEQ setintegrab
+\ no - finish
 RTS
 :
 .setcmos
@@ -475,7 +492,6 @@ REM byte for CR = 25
 buffer=FNalloc(25)
 :
 NEXT
-:
 save$="*SAVE FSTime "+STR$~code+"+"+STR$~(O%-code)+" FFFF"+STR$~start+" FFFF"+STR$~target
 PRINT save$
 OSCLI save$
