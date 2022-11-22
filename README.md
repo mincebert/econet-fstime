@@ -59,18 +59,18 @@ Bugs
 The year code doesn't handle dates beyond 2099, even though the 7-bit range
 extends the supported years up to 2108 - dates beyond this are often not
 supported by the [patched] Master MOS and IntegraB IBOS, anyway).  If this
-ever becomes and issue, someone else will have to solve it!
+ever becomes an issue, someone else will have to solve it!
 
-There doesn't appear to be a way to tell is the OSWORD &0F call has succeeded,
+There doesn't appear to be a way to tell if the OSWORD &0F call has succeeded,
 other than checking the subsequent time with *TIME, so no error will be
 displayed, if this fails.
 
 If the `I` option is used on a computer without an IntegraB IBOS, strange
 output or errors may be displayed, depending on the support for the `*DATE`
-and `*TIME` commands (the Master will typically run *DATE from the Econet
+and `*TIME` commands (a BBC Master will typically run `*DATE` from the Econet
 Library directory and then the MOS `*TIME` command, for example).
 
 The time retrieved from a Level 3 fileserver appears to always contain the
 seconds as 00, so the time will be rounded down to the nearest minute.  This
 may be a limitation of the software or have been caused by the extra space
-for the year patch.
+required for the 7-bit year patch.
