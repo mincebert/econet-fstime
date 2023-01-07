@@ -6,14 +6,15 @@ REM>FSTimeAsm
 REM Read time from an Econet
 REM fileserver, optionally
 REM setting the local machine's
-REM CMOS or IntegraB RTC.
+REM CMOS (OSWORD) or IntegraB
+REM RTC.
 REM
 REM This handles dates using the
 REM 3-bit hack into the day
 REM field, as supported by
 REM PiEconetBridge.
 :
-VER$="v0.2 (2022-11-20)"
+VER$="v0.3 (2023-01-07)"
 :
 DIM code 1000
 target=&2C00
@@ -54,8 +55,6 @@ BEQ loop
 CMP #13 \ =CR
 BEQ storeopt
 CMP #ASC"S"
-BEQ detectclock
-CMP #ASC"C"
 BEQ storeopt
 CMP #ASC"I"
 BEQ storeopt
@@ -70,22 +69,8 @@ BNE loop
 RTS
 :
 .usagemsg
-EQUS "Usage: FSTIME (S|C|I)"
+EQUS "Usage: FSTIME (S|I)"
 EQUB 13 \ =CR
-:
-.detectclock
-LDA #&49 \ =detect IntegraB
-LDX #&FF
-LDY #0
-JSR OSBYTE
-CPX #&49 \ =IntegraB present
-BEQ isintegrab
-\ no IntegraB - assume CMOS
-LDA #ASC"C"
-JMP storeopt
-:
-.isintegrab
-LDA #ASC"I"
 :
 .storeopt
 \ store first non-space char in
@@ -211,7 +196,7 @@ ADC #7
 :
 \ Y is offset into string
 \ buffer; start at 1 to skip
-\ CMOS op byte, if needed
+\ CMOS OSWORD op byte, if needed
 LDY #1
 :
 \ store weekday string
@@ -272,26 +257,26 @@ BNE loop
 :
 \ update the local host clock
 LDA SETCLOCK
-CMP #ASC"C" \ set CMOS clock
-BEQ setcmos
+CMP #ASC"S" \ set OSWORD clock
+BEQ setosword
 CMP #ASC"I" \ set IntegraB clock
 BEQ setintegrab
 \ no - finish
 RTS
 :
-.setcmos
+.setosword
 \ print msg and update clock
 LDY #&FF
 .loop
 INY
-LDA setcmosmsg,Y
+LDA setoswordmsg,Y
 JSR OSASCI
 CMP #13 \ =CR
 BNE loop
 :
 LDA #24 \ update date+time op
 STA buffer
-LDA #&0F \ =write CMOS date+time
+LDA #&0F \ =write date+time
 LDX #buffer AND &FF
 LDY #buffer DIV &100
 JMP OSWORD \ implicit RTS
@@ -355,8 +340,8 @@ EQUS "DATE ="
 .settimecmd
 EQUS "TIME ="
 :
-.setcmosmsg
-EQUS "Setting CMOS clock"
+.setoswordmsg
+EQUS "Setting clock"
 EQUB 13
 :
 .setintegrabmsg
@@ -483,8 +468,8 @@ cblock=FNalloc(9)
 :
 REM buffer for building time
 REM with byte at the start for
-REM specifying CMOS operation,
-REM if required
+REM specifying OSWORLD clock
+REM operation, if required
 REM
 REM "Wkd,DD Mon YYYY.hh.mm.ss"
 REM is longest at 24 bytes + 1

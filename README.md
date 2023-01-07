@@ -10,20 +10,15 @@ The fetch is done by [OSWORD &14](https://beebwiki.mdfs.net/OSWORD_%2614)
 (communicate with fileserver), function 16 (read date and time) provided by
 the Econet NFS/ANFS ROM.
 
-When run with `S`, it will attempt to set the clock on the local machine to
-the time retrieved from the fileserver.  This will be done in one of two ways,
-depending on the result of
-[OSBYTE &49](https://beebwiki.mdfs.net/OSBYTE_%2649), which identifies an
-IntegraB board is present (an upgrade for a Model B with a battery-backed
-RTC):
+When run with `S` (i.e. `*FSTIME S`), it will attempt to set the clock on the
+local machine to the time retrieved from the fileserver.  This will be done
+using [OSWORD &0F](https://beebwiki.mdfs.net/OSWORD_%260F), which
+will set the CMOS clock on a BBC Master, or the RTC on a Model B with an
+IntegraB and IBOS 1.26 or greater (or anything else that supports OSWORD &0F).
 
-* if an IntegraB is not detected,
-[OSWORD &0F](https://beebwiki.mdfs.net/OSWORD_%260F) call will be used, which
-will set the CMOS clock on a BBC Master
-* if an IntegraB is detected, the clock on that will be set using the [e.g.]
-`*DATE =19/11/2022` and `*TIME =13:40:15` OS commands
-
-These modes can be forced using the `I` and `C` options, respectively.
+To set the clock on an IntegraB with IBOS 1.25 or earlier, the `I` option will
+set the clock using the [e.g.] `*DATE =19/11/2022` and `*TIME =13:40:15` OS
+commands.
 
 Reading the clock supports the 'date hack' to extend the original range of
 years from the 4-bit offset from 1981 (up to 1996) by using the top 3 bits of
@@ -45,7 +40,8 @@ The utility is in 6502 machine code assembled by the supplied BBC BASIC
 program.
 
 The BASIC program is supplied in tokenised form and as a text file which can
-be `*EXEC`d to create.  This is to enable changes to be tracked by git.
+be `*EXEC`d to create.  This is to enable changes to be tracked by
+[git](https://git-scm.com).
 
 The code is set to load at &FFFF2C00 and is under &400 in size so should load
 below the screen memory area, regardless of display MODE.  On a Tube system,
