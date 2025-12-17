@@ -16,10 +16,6 @@ using [OSWORD &0F](https://beebwiki.mdfs.net/OSWORD_%260F), which
 will set the CMOS clock on a BBC Master, or the RTC on a Model B with an
 IntegraB and IBOS 1.26 or greater (or anything else that supports OSWORD &0F).
 
-To set the clock on an IntegraB with IBOS 1.25 or earlier, the `I` option will
-set the clock using the [e.g.] `*DATE =19/11/2022` and `*TIME =13:40:15` OS
-commands.
-
 Reading the clock supports the 'date hack' to extend the original range of
 years from the 4-bit offset from 1981 (up to 1996) by using the top 3 bits of
 the 'day' field for years up to 2099.
@@ -60,11 +56,6 @@ ever becomes an issue, someone else will have to solve it!
 There doesn't appear to be a way to tell if the OSWORD &0F call has succeeded,
 other than checking the subsequent time with *TIME, so no error will be
 displayed, if this fails.
-
-If the `I` option is used on a computer without an IntegraB IBOS, strange
-output or errors may be displayed, depending on the support for the `*DATE`
-and `*TIME` commands (a BBC Master will typically run `*DATE` from the Econet
-Library directory and then the MOS `*TIME` command, for example).
 
 The time retrieved from a Level 3 fileserver appears to always contain the
 seconds as 00, so the time will be rounded down to the nearest minute.  This

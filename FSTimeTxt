@@ -14,7 +14,7 @@ REM 3-bit hack into the day
 REM field, as supported by
 REM PiEconetBridge.
 :
-VER$="v0.3 (2023-01-07)"
+VER$="v0.4 (2025-12-18)"
 :
 DIM code 1000
 target=&2C00
@@ -56,8 +56,6 @@ CMP #13 \ =CR
 BEQ storeopt
 CMP #ASC"S"
 BEQ storeopt
-CMP #ASC"I"
-BEQ storeopt
 :
 LDY #&FF
 .loop
@@ -69,7 +67,7 @@ BNE loop
 RTS
 :
 .usagemsg
-EQUS "Usage: FSTIME (S|I)"
+EQUS "Usage: FSTIME (S)"
 EQUB 13 \ =CR
 :
 .storeopt
@@ -259,8 +257,6 @@ BNE loop
 LDA SETCLOCK
 CMP #ASC"S" \ set OSWORD clock
 BEQ setosword
-CMP #ASC"I" \ set IntegraB clock
-BEQ setintegrab
 \ no - finish
 RTS
 :
@@ -281,79 +277,9 @@ LDX #buffer AND &FF
 LDY #buffer DIV &100
 JMP OSWORD \ implicit RTS
 :
-.setintegrab
-LDY #&FF
-.loop
-INY
-LDA setintegrabmsg,Y
-JSR OSASCI
-CMP #13 \ =CR
-BNE loop
-:
-\ build *DATE command
-:
-\ "DATE ="
-:
-LDY #0 \ post-inc for JSR sta
-.loop
-LDA setdatecmd,Y
-STA buffer,Y
-INY
-CMP #ASC"="
-BNE loop
-:
-\ "DD/MM/YYYY"
-:
-LDA cblock+4 \ =(Y)D
-AND #&1F
-JSR stdec0
-LDA #ASC"/"
-JSR sta
-LDA cblock+5 \ =YM
-AND #&0F
-JSR stdec0
-LDA #ASC"/"
-JSR sta
-JSR styear4
-JSR stcr
-:
-JSR bufferoscli
-:
-\ "TIME =hh.mm.ss"
-:
-LDY #0 \ post-inc for JSR sta
-.loop
-LDA settimecmd,Y
-STA buffer,Y
-INY
-CMP #ASC"="
-BNE loop
-:
-JSR sttime
-JSR stcr
-JMP bufferoscli \ implicit RTS
-:
-\ star commands to set date and
-\ time on IntegraB
-.setdatecmd
-EQUS "DATE ="
-.settimecmd
-EQUS "TIME ="
-:
 .setoswordmsg
 EQUS "Setting clock"
 EQUB 13
-:
-.setintegrabmsg
-EQUS "Setting IntegraB clock"
-EQUB 13
-:
-.bufferoscli
-\ Execute OSCLI on command line
-\ at buffer.
-LDX #buffer AND &FF
-LDY #buffer DIV &100
-JMP XOSCLI \ implicit RTS
 :
 .styear4
 \ Store 4 digit year from YEAR
